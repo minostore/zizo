@@ -113,9 +113,9 @@ class _AccessScreenState extends State<AccessScreen> {
   void dispose() { name.dispose(); phone.dispose(); email.dispose(); password.dispose(); super.dispose(); }
   Future<void> continueBooking() async {
     final identifier = phone.text.trim();
-    if (identifier.isEmpty || password.text.isEmpty) { message(context, 'اكتب رقم الهاتف أو البريد الإلكتروني وكلمة المرور.'); return; }
-    if (!login && (name.text.trim().length < 2 || phone.text.replaceAll(RegExp(r'\D'), '').length < 9 || !email.text.contains('@') || password.text.length < 8)) {
-      message(context, 'أكمل الاسم والهاتف والبريد الإلكتروني، وكلمة المرور 8 أحرف على الأقل.'); return;
+    if (identifier.isEmpty || password.text.isEmpty) { message(context, login ? 'اكتب رقم الهاتف أو البريد الإلكتروني وكلمة المرور.' : 'اكتب رقم الهاتف وكلمة المرور.'); return; }
+    if (!login && (name.text.trim().length < 2 || phone.text.replaceAll(RegExp(r'\D'), '').length < 9 || (email.text.trim().isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.text.trim())) || password.text.length < 8)) {
+      message(context, 'اكتب الاسم ورقم هاتف صحيح، ولو هتضيف بريد إلكتروني اتأكد إنه صحيح، وكلمة المرور 8 أحرف على الأقل.'); return;
     }
     setState(() => busy = true);
     try {
@@ -143,11 +143,11 @@ class _AccessScreenState extends State<AccessScreen> {
           Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(13)), child: Row(children: [Expanded(child: ModeButton(title: 'تسجيل الدخول', selected: login, onTap: () => setState(() => login = true))), Expanded(child: ModeButton(title: 'حساب جديد', selected: !login, onTap: () => setState(() => login = false)))])),
           const SizedBox(height: 19),
           if (!login) ...[const FieldLabel('الاسم'), const SizedBox(height: 7), TextField(controller: name, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'اسمك بالكامل', prefixIcon: Icon(Icons.person_outline, color: gold))), const SizedBox(height: 15)],
-          const FieldLabel('رقم الهاتف أو البريد الإلكتروني'), const SizedBox(height: 7),
-          TextField(controller: phone, keyboardType: TextInputType.emailAddress, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(hintText: 'رقم الهاتف أو email@example.com', prefixIcon: Icon(Icons.person_outline, color: gold))),
+          FieldLabel(login ? 'رقم الهاتف أو البريد الإلكتروني' : 'رقم الهاتف'), const SizedBox(height: 7),
+          TextField(controller: phone, keyboardType: login ? TextInputType.emailAddress : TextInputType.phone, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, decoration: InputDecoration(hintText: login ? 'رقم الهاتف أو email@example.com' : '01xxxxxxxxx', prefixIcon: const Icon(Icons.phone_outlined, color: gold))),
           if (!login) ...[
-            const SizedBox(height: 14), const FieldLabel('البريد الإلكتروني'), const SizedBox(height: 7),
-            TextField(controller: email, keyboardType: TextInputType.emailAddress, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(hintText: 'email@example.com', prefixIcon: Icon(Icons.email_outlined, color: gold))),
+            const SizedBox(height: 14), const FieldLabel('البريد الإلكتروني (اختياري)'), const SizedBox(height: 7),
+            TextField(controller: email, keyboardType: TextInputType.emailAddress, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(hintText: 'تقدر تسيبه فاضي', prefixIcon: Icon(Icons.email_outlined, color: gold))),
           ],
           const SizedBox(height: 14), const FieldLabel('كلمة المرور'), const SizedBox(height: 7),
           TextField(controller: password, obscureText: true, textDirection: ui.TextDirection.ltr, decoration: const InputDecoration(hintText: '8 أحرف على الأقل', prefixIcon: Icon(Icons.lock_outline, color: gold))),
@@ -218,7 +218,31 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(leading: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_forward_rounded)), title: const Text('إنشاء حجز', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)), actions: const [Padding(padding: EdgeInsetsDirectional.only(end: 15), child: BrandMark(compact: true))]),
         body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 720), child: loadError != null && data == null ? errorPanel() : ListView(padding: const EdgeInsets.fromLTRB(18, 8, 18, 32), children: [
-          ShopStatus(open: data?.shopOpen ?? true), if (data?.bookingsEnabled == false) ...[const SizedBox(height: 12), const NoticeBox("الحجز متوقف مؤقتًا من إدارة الصالون. لا يمكن إرسال حجز جديد حاليًا.")], const SizedBox(height: 18),
+          ShopStatus(open: data?.shopOpen ?? true),
+          const SizedBox(height: 12),
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WheelScreen())),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(colors: [gold.withValues(alpha: .18), panel]),
+                border: Border.all(color: gold.withValues(alpha: .45)),
+              ),
+              child: const Row(children: [
+                CircleAvatar(backgroundColor: gold, child: Icon(Icons.card_giftcard_rounded, color: ink)),
+                SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('عجلة الحظ والهدايا', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                  SizedBox(height: 4),
+                  Text('جرّب حظك واكتشف هديتك', style: TextStyle(color: muted, fontSize: 12)),
+                ])),
+                Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 16),
+              ]),
+            ),
+          ),
+          if (data?.bookingsEnabled == false) ...[const SizedBox(height: 12), const NoticeBox("الحجز متوقف مؤقتًا من إدارة الصالون. لا يمكن إرسال حجز جديد حاليًا.")], const SizedBox(height: 18),
           const Text('تفاصيل الحجز', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800)), const SizedBox(height: 4), const Text('اختار خدمتك والموعد المناسب ليك.', style: TextStyle(color: muted, fontSize: 12)), const SizedBox(height: 19),
           const FieldLabel('الاسم'), const SizedBox(height: 7), TextField(controller: name, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'اسمك بالكامل', prefixIcon: Icon(Icons.person_outline, color: gold))), const SizedBox(height: 14),
           const FieldLabel('رقم الهاتف'), const SizedBox(height: 7), TextField(controller: phone, keyboardType: TextInputType.phone, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(hintText: '+20 1X XXXX XXXX', prefixIcon: Icon(Icons.phone_outlined, color: gold))), const SizedBox(height: 18),

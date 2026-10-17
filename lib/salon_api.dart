@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -85,13 +86,25 @@ class SalonApi {
   Map<String, String> get _headers => const {'Content-Type': 'application/json', 'Accept': 'application/json'};
 
   Future<Map<String, dynamic>> _get(String path) async {
-    final response = await _client.get(_uri(path), headers: _headers).timeout(const Duration(seconds: 15));
-    return _decode(response);
+    try {
+      final response = await _client.get(_uri(path), headers: _headers).timeout(const Duration(seconds: 35));
+      return _decode(response);
+    } on TimeoutException {
+      throw const SalonApiException('الخادم اتأخر في الرد. اتأكد من الإنترنت وحاول مرة أخرى.');
+    } on FormatException {
+      throw const SalonApiException('استجابة الخادم غير مفهومة. حاول مرة أخرى بعد قليل.');
+    }
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) async {
-    final response = await _client.post(_uri(path), headers: _headers, body: jsonEncode(body)).timeout(const Duration(seconds: 20));
-    return _decode(response);
+    try {
+      final response = await _client.post(_uri(path), headers: _headers, body: jsonEncode(body)).timeout(const Duration(seconds: 45));
+      return _decode(response);
+    } on TimeoutException {
+      throw const SalonApiException('طلبك استغرق وقتًا أطول من المعتاد. اتأكد من الإنترنت وحاول مرة أخرى. لو المشكلة مستمرة، راجع حالة خادم لوحة التحكم.');
+    } on FormatException {
+      throw const SalonApiException('استجابة الخادم غير مفهومة. حاول مرة أخرى بعد قليل.');
+    }
   }
 
   Map<String, dynamic> _decode(http.Response response) {
