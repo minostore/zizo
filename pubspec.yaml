@@ -1,0 +1,36 @@
+name: razor_booking
+description: "تطبيق حجز حلاقة عربي لعملاء الصالون في مصر"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.6.0
+  intl: ^0.20.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/barber_app_icon.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/barber_app_icon.png
+  remove_alpha_ios: true
+  adaptive_icon_foreground: assets/barber_app_icon.png
+  adaptive_icon_background: "#090908"
+  adaptive_icon_monochrome: assets/barber_app_icon.png
