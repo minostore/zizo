@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'salon_api.dart';
 
@@ -80,8 +81,10 @@ class WelcomeScreen extends StatelessWidget {
                     GoldButton(label: 'ابدأ الحجز', icon: Icons.arrow_back_rounded, onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccessScreen()))),
                     const SizedBox(height: 10),
                     OutlinedButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccessScreen(showLogin: true))), icon: const Icon(Icons.person_outline_rounded, size: 18), label: const Text('تسجيل الدخول'), style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Color(0xFF34322B)), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)))),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WheelScreen())), icon: const Icon(Icons.card_giftcard, size: 18), label: const Text('عجلة الحظ والهدايا'), style: OutlinedButton.styleFrom(foregroundColor: goldLight, side: BorderSide(color: gold.withValues(alpha: .45)), padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)))),
                     const SizedBox(height: 12),
-                    const Text('الحجز متاح حتى لو المحل مغلق — هنوضح حالته قبل التأكيد', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF89867D), fontSize: 10)),
+                    const Text('سجّل حسابك لحفظ بياناتك، ويمكنك تجربة عجلة الحظ للعروض والهدايا.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF89867D), fontSize: 10)),
                   ]),
                 ),
               ),
@@ -102,11 +105,32 @@ class _AccessScreenState extends State<AccessScreen> {
   late bool login = widget.showLogin;
   final name = TextEditingController();
   final phone = TextEditingController();
+  final email = TextEditingController();
+  final password = TextEditingController();
+  bool busy = false;
+  final api = SalonApi();
   @override
-  void dispose() { name.dispose(); phone.dispose(); super.dispose(); }
-  void continueBooking() {
-    if (phone.text.replaceAll(RegExp(r'\D'), '').length < 9) { message(context, 'اكتب رقم هاتف صحيح علشان نكمل.'); return; }
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => BookingScreen(initialName: name.text.trim(), initialPhone: phone.text.trim())));
+  void dispose() { name.dispose(); phone.dispose(); email.dispose(); password.dispose(); super.dispose(); }
+  Future<void> continueBooking() async {
+    final identifier = phone.text.trim();
+    if (identifier.isEmpty || password.text.isEmpty) { message(context, 'اكتب رقم الهاتف أو البريد الإلكتروني وكلمة المرور.'); return; }
+    if (!login && (name.text.trim().length < 2 || phone.text.replaceAll(RegExp(r'\D'), '').length < 9 || !email.text.contains('@') || password.text.length < 8)) {
+      message(context, 'أكمل الاسم والهاتف والبريد الإلكتروني، وكلمة المرور 8 أحرف على الأقل.'); return;
+    }
+    setState(() => busy = true);
+    try {
+      final customer = login
+          ? await api.login(identifier: identifier, password: password.text)
+          : await api.register(name: name.text.trim(), phone: identifier, email: email.text.trim(), password: password.text);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('customer_name', (customer['name'] as String?) ?? name.text.trim());
+      await prefs.setString('customer_phone', (customer['phone'] as String?) ?? identifier);
+      await prefs.setString('customer_email', (customer['email'] as String?) ?? email.text.trim());
+      if (!mounted) return;
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => BookingScreen(initialName: (customer['name'] as String?) ?? name.text.trim(), initialPhone: (customer['phone'] as String?) ?? identifier)));
+    } catch (e) {
+      if (mounted) message(context, e.toString().replaceFirst('Exception: ', ''));
+    } finally { if (mounted) setState(() => busy = false); }
   }
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -114,18 +138,21 @@ class _AccessScreenState extends State<AccessScreen> {
         body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 540), child: ListView(padding: const EdgeInsets.fromLTRB(22, 15, 22, 30), children: [
           const Text('أهلاً بيك', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          Text(login ? 'اكتب رقمك علشان تكمّل بيانات الحجز.' : 'ضيف بيانات التواصل علشان نسجل حجزك بسهولة.', style: const TextStyle(color: muted, fontSize: 13, height: 1.7)),
+          Text(login ? 'سجّل برقم الهاتف أو البريد الإلكتروني وكلمة المرور.' : 'أنشئ حسابًا لحفظ بياناتك واستخدامها في الحجوزات القادمة.', style: const TextStyle(color: muted, fontSize: 13, height: 1.7)),
           const SizedBox(height: 22),
           Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(13)), child: Row(children: [Expanded(child: ModeButton(title: 'تسجيل الدخول', selected: login, onTap: () => setState(() => login = true))), Expanded(child: ModeButton(title: 'حساب جديد', selected: !login, onTap: () => setState(() => login = false)))])),
           const SizedBox(height: 19),
           if (!login) ...[const FieldLabel('الاسم'), const SizedBox(height: 7), TextField(controller: name, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'اسمك بالكامل', prefixIcon: Icon(Icons.person_outline, color: gold))), const SizedBox(height: 15)],
-          const FieldLabel('رقم الهاتف'), const SizedBox(height: 7),
-          TextField(controller: phone, keyboardType: TextInputType.phone, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(hintText: '+20 1X XXXX XXXX', prefixIcon: Icon(Icons.phone_outlined, color: gold))),
-          const SizedBox(height: 14),
-          Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: const Color(0xFF19170F), borderRadius: BorderRadius.circular(12), border: Border.all(color: gold.withValues(alpha: .16))), child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.info_outline, color: gold, size: 17), SizedBox(width: 9), Expanded(child: Text('تقدر تكمل حجزك كضيف. التحقق الآمن برمز SMS يحتاج إعداد مزود رسائل.', style: TextStyle(color: muted, height: 1.7, fontSize: 11)))])),
+          const FieldLabel('رقم الهاتف أو البريد الإلكتروني'), const SizedBox(height: 7),
+          TextField(controller: phone, keyboardType: TextInputType.emailAddress, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(hintText: 'رقم الهاتف أو email@example.com', prefixIcon: Icon(Icons.person_outline, color: gold))),
+          if (!login) ...[
+            const SizedBox(height: 14), const FieldLabel('البريد الإلكتروني'), const SizedBox(height: 7),
+            TextField(controller: email, keyboardType: TextInputType.emailAddress, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(hintText: 'email@example.com', prefixIcon: Icon(Icons.email_outlined, color: gold))),
+          ],
+          const SizedBox(height: 14), const FieldLabel('كلمة المرور'), const SizedBox(height: 7),
+          TextField(controller: password, obscureText: true, textDirection: ui.TextDirection.ltr, decoration: const InputDecoration(hintText: '8 أحرف على الأقل', prefixIcon: Icon(Icons.lock_outline, color: gold))),
           const SizedBox(height: 20),
-          GoldButton(label: 'المتابعة للحجز', icon: Icons.arrow_back_rounded, onPressed: continueBooking),
-          const SizedBox(height: 12), TextButton(onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const BookingScreen())), child: const Text('المتابعة كضيف')),
+          GoldButton(label: busy ? 'جارٍ التحقق...' : (login ? 'تسجيل الدخول والمتابعة' : 'إنشاء الحساب وبدء الحجز'), icon: Icons.arrow_back_rounded, onPressed: busy ? null : continueBooking),
         ]))),
       );
 }
@@ -191,7 +218,7 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(leading: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_forward_rounded)), title: const Text('إنشاء حجز', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)), actions: const [Padding(padding: EdgeInsetsDirectional.only(end: 15), child: BrandMark(compact: true))]),
         body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 720), child: loadError != null && data == null ? errorPanel() : ListView(padding: const EdgeInsets.fromLTRB(18, 8, 18, 32), children: [
-          ShopStatus(open: data?.shopOpen ?? true), const SizedBox(height: 18),
+          ShopStatus(open: data?.shopOpen ?? true), if (data?.bookingsEnabled == false) ...[const SizedBox(height: 12), const NoticeBox("الحجز متوقف مؤقتًا من إدارة الصالون. لا يمكن إرسال حجز جديد حاليًا.")], const SizedBox(height: 18),
           const Text('تفاصيل الحجز', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800)), const SizedBox(height: 4), const Text('اختار خدمتك والموعد المناسب ليك.', style: TextStyle(color: muted, fontSize: 12)), const SizedBox(height: 19),
           const FieldLabel('الاسم'), const SizedBox(height: 7), TextField(controller: name, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'اسمك بالكامل', prefixIcon: Icon(Icons.person_outline, color: gold))), const SizedBox(height: 14),
           const FieldLabel('رقم الهاتف'), const SizedBox(height: 7), TextField(controller: phone, keyboardType: TextInputType.phone, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, decoration: const InputDecoration(hintText: '+20 1X XXXX XXXX', prefixIcon: Icon(Icons.phone_outlined, color: gold))), const SizedBox(height: 18),
@@ -206,10 +233,64 @@ class _BookingScreenState extends State<BookingScreen> {
           Row(children: [Expanded(child: TextField(controller: coupon, textCapitalization: TextCapitalization.characters, textDirection: ui.TextDirection.ltr, textAlign: TextAlign.left, onChanged: (_) => setState(() => discount = null), decoration: const InputDecoration(hintText: 'اكتب الكود هنا', prefixIcon: Icon(Icons.local_offer_outlined, color: gold)))), const SizedBox(width: 8), OutlinedButton(onPressed: busy ? null : applyDiscount, style: OutlinedButton.styleFrom(foregroundColor: goldLight, side: BorderSide(color: gold.withValues(alpha: .55)), padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text('تطبيق'))]),
           if (discount != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text('وفرت ${egp(discount!.amount)}', style: const TextStyle(color: green, fontSize: 12))), const SizedBox(height: 15),
           Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(14), border: Border.all(color: gold.withValues(alpha: .22))), child: Row(children: [const Expanded(child: Text('الإجمالي التقديري', style: TextStyle(color: muted, fontSize: 12))), Text(egp(total), style: const TextStyle(color: goldLight, fontWeight: FontWeight.w800, fontSize: 20))])), const SizedBox(height: 13),
-          GoldButton(label: busy ? 'جارٍ تأكيد الحجز…' : 'تأكيد الحجز', icon: Icons.arrow_back_rounded, onPressed: busy ? null : submit), const SizedBox(height: 10), const Text('الأسعار بالجنيه المصري · الحجز متاح في الحالتين', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF858279), fontSize: 10)),
+          GoldButton(label: busy ? 'جارٍ تأكيد الحجز…' : 'تأكيد الحجز', icon: Icons.arrow_back_rounded, onPressed: (busy || data?.bookingsEnabled == false) ? null : submit), const SizedBox(height: 10), const Text('الأسعار بالجنيه المصري · الحجز متاح في الحالتين', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF858279), fontSize: 10)),
         ]))),
       );
   Widget errorPanel() => Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off_outlined, color: gold, size: 40), const SizedBox(height: 13), const Text('مش قادرين نتصل بالخادم', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700)), const SizedBox(height: 7), Text(loadError ?? '', textAlign: TextAlign.center, style: const TextStyle(color: muted, fontSize: 12)), const SizedBox(height: 14), OutlinedButton(onPressed: load, child: const Text('إعادة المحاولة'))])));
+}
+
+class WheelScreen extends StatefulWidget {
+  const WheelScreen({super.key});
+  @override
+  State<WheelScreen> createState() => _WheelScreenState();
+}
+
+class _WheelScreenState extends State<WheelScreen> {
+  final api = SalonApi();
+  bool loading = true, spinning = false;
+  List<Map<String, dynamic>> prizes = [];
+  String? result;
+  @override
+  void initState() { super.initState(); loadPrizes(); }
+  Future<void> loadPrizes() async {
+    try { final data = await api.bootstrap(); if (mounted) setState(() { prizes = data.wheelPrizes; loading = false; }); }
+    catch (_) { if (mounted) setState(() { loading = false; }); }
+  }
+  Future<void> spin() async {
+    if (spinning || prizes.isEmpty) return;
+    setState(() { spinning = true; result = null; });
+    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final response = await api.spinWheel();
+      if (!mounted) return;
+      final prize = response['prize'] as Map<String, dynamic>? ?? {};
+      setState(() { result = prize['label'] as String? ?? 'جائزة'; spinning = false; });
+      message(context, 'مبروك! نتيجتك: $result');
+    } catch (e) {
+      if (mounted) { setState(() => spinning = false); message(context, e.toString().replaceFirst('Exception: ', '')); }
+    }
+  }
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('عجلة الحظ والهدايا'), leading: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_forward))),
+    body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 520), child: ListView(padding: const EdgeInsets.all(22), children: [
+      Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(22), border: Border.all(color: gold.withValues(alpha: .25))), child: Column(children: [
+        const Icon(Icons.card_giftcard, size: 66, color: gold), const SizedBox(height: 16),
+        const Text('لف العجلة واكسب هدية', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900)), const SizedBox(height: 8),
+        const Text('قد تكون جائزتك كوبون خصم أو خدمة من الصالون.', textAlign: TextAlign.center, style: TextStyle(color: muted, height: 1.7)),
+        const SizedBox(height: 22),
+        if (loading) const Center(child: CircularProgressIndicator())
+        else if (prizes.isEmpty) const Text('لا توجد جوائز متاحة حاليًا. تابعنا قريبًا!', style: TextStyle(color: muted))
+        else ...[
+          Container(width: 190, height: 190, decoration: BoxDecoration(shape: BoxShape.circle, color: ink, border: Border.all(color: gold, width: 5), boxShadow: [BoxShadow(color: gold.withValues(alpha: .12), blurRadius: 25)]), child: Center(child: Padding(padding: const EdgeInsets.all(18), child: Text(spinning ? 'تدور العجلة...' : (result ?? 'حظ سعيد!'), textAlign: TextAlign.center, style: const TextStyle(color: goldLight, fontSize: 19, fontWeight: FontWeight.w900))))),
+          const SizedBox(height: 20),
+          GoldButton(label: spinning ? 'جاري الدوران...' : 'لف العجلة', icon: Icons.casino_outlined, onPressed: spinning ? null : spin),
+          const SizedBox(height: 18),
+          ...prizes.map((p) => ListTile(leading: const Icon(Icons.redeem, color: gold), title: Text(p['label'] as String? ?? 'جائزة'), subtitle: Text((p['kind'] == 'service') ? 'خدمة مجانية' : 'كوبون خصم', style: const TextStyle(color: muted))))
+        ]
+      ]))
+    ])))
+  );
 }
 
 class ConfirmationScreen extends StatelessWidget {

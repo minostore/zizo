@@ -26,11 +26,14 @@ class SalonService {
 }
 
 class SalonBootstrap {
-  const SalonBootstrap({required this.shopOpen, required this.services});
-  final bool shopOpen;
+  const SalonBootstrap({required this.shopOpen, required this.bookingsEnabled, required this.wheelPrizes, required this.services});
+  final bool shopOpen, bookingsEnabled;
+  final List<Map<String, dynamic>> wheelPrizes;
   final List<SalonService> services;
   factory SalonBootstrap.fromJson(Map<String, dynamic> json) => SalonBootstrap(
         shopOpen: json['shopOpen'] == true,
+        bookingsEnabled: json['bookingsEnabled'] != false,
+        wheelPrizes: (json['wheelPrizes'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().toList(),
         services: (json['services'] as List<dynamic>? ?? const []).map((item) => SalonService.fromJson(item as Map<String, dynamic>)).toList(),
       );
 }
@@ -69,7 +72,7 @@ class BookingReceipt {
 class SalonApi {
   SalonApi({http.Client? client}) : _client = client ?? http.Client();
   final http.Client _client;
-  static const _configuredBase = String.fromEnvironment('API_BASE_URL');
+  static const _configuredBase = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://zizo-admin3.vercel.app');
 
   String get _baseUrl {
     if (_configuredBase.trim().isNotEmpty) return _configuredBase.trim().replaceFirst(RegExp(r'/+$'), '');
@@ -99,6 +102,9 @@ class SalonApi {
     return decoded;
   }
 
+  Future<Map<String, dynamic>> spinWheel() => _post('/api/mobile/wheel/spin', {});
+  Future<Map<String, dynamic>> register({required String name, required String phone, required String email, required String password}) => _post('/api/mobile/auth/register', {'name': name, 'phone': phone, 'email': email, 'password': password});
+  Future<Map<String, dynamic>> login({required String identifier, required String password}) => _post('/api/mobile/auth/login', {'identifier': identifier, 'password': password});
   Future<SalonBootstrap> bootstrap() async => SalonBootstrap.fromJson(await _get('/api/mobile/bootstrap'));
   Future<DiscountPreview> validateDiscount(String code, List<String> serviceIds) async => DiscountPreview.fromJson(await _post('/api/mobile/discounts/validate', {'code': code, 'serviceIds': serviceIds}));
 

@@ -1,48 +1,35 @@
-name: Flutter Android Build
+name: Flutter Android CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [main, master]
   pull_request:
-    branches: [master, main]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-android:
-    name: Check and build Android APK
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
-      - name: Show Flutter version
-        run: flutter --version
-
       - name: Install dependencies
         run: flutter pub get
-
-      - name: Analyze Dart code
+      - name: Analyze
         run: flutter analyze
-
-      - name: Run tests
+      - name: Test
         run: flutter test
-
-      - name: Build release APK
+      - name: Build APK
         run: flutter build apk --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
-
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: razor-booking-android-apk
+          name: razor-booking-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
           retention-days: 14
