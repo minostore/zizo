@@ -1,5 +1,5 @@
 name: razor_booking
-description: "تطبيق حجز حلاقة عربي لعملاء الصالون في مصر"
+description: "ZIZO - تطبيق حجز صالون الحلاقة"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -15,6 +15,8 @@ dependencies:
   http: ^1.6.0
   intl: ^0.20.3
   shared_preferences: ^2.5.3
+  url_launcher: ^6.3.1
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
@@ -26,6 +28,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/barber_app_icon.png
+    - assets/zizo_z.png
 
 flutter_launcher_icons:
   android: true

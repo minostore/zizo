@@ -26,7 +26,7 @@ jobs:
       - name: Test
         run: flutter test
       - name: Build APK
-        run: flutter build apk --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
+        run: flutter build apk --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://zizo-admin3.vercel.app' }}
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
